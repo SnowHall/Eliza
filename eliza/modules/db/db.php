@@ -1,15 +1,15 @@
 <?php
 /**
  * Eliza - Simple php acceptance testing framework
- * 
- * 
+ *
+ *
  * @author		SnowHall - http://snowhall.com
  * @website		http://elizatesting.com
  * @email		support@snowhall.com
- * 
- * @version		0.1.0
- * @date		March 8, 2013
- * 
+ *
+ * @version		0.2.0
+ * @date		April 18, 2013
+ *
  * Eliza - simple framework for BDD development and acceptance testing.
  * Eliza has user-friendly web interface that allows run and manage your tests from your favorite browser.
  *
@@ -18,35 +18,71 @@
 
 class dbModule extends Module
 {
+  // Db connection
   private $db;
+
+  // Current query
   private $query;
 
+  /**
+   * Initialize db module
+   */
   public function __construct()
   {
     parent::__construct();
     $this->initDb();
   }
 
+  /**
+   * Module options for Db connection
+   *
+   * @return array Module's options
+   */
+  public function options() {
+    return array(
+      'username'=>'',
+      'password'=>'',
+      'host'=>'',
+      'dbname'=>'',
+    );
+  }
+
+  /**
+   * Initialize Db connection
+   */
   public function initDb()
   {
      try {
        $username = Config::getModuleConfig('db','username');
        $password =  Config::getModuleConfig('db','password');
-       $host = Config::getModuleConfig('db','host','localhost');
+       $host = Config::getModuleConfig('db','host');
        $dbname = Config::getModuleConfig('db','dbname');
 
-       $this->db = new PDO('mysql:host='.$host.';dbname='.$dbname, $username, $password);
-       if (!$this->db) {
-         die('Connection Db error.'.var_dump(PDO::errorInfo()));
+       if ($username && $host) {
+          $this->db = new PDO('mysql:host='.$host.';dbname='.$dbname, $username, $password);
+          if (!$this->db) {
+            die('Connection Db error.'.var_dump(PDO::errorInfo()));
+          }
        }
-       //$dbh = new PDO("mysql:dbname={$dbname}; host={$hostname}", $username, $password);
      } catch (PDOException $e) {
        die('Connection Db error: ' . $e->getMessage());
      }
   }
 
+  /**
+   * Represents user action: check fields existing in specified table
+   *
+   * @param string $table Table name
+   * @param array $fields Fields names
+   * @return type
+   */
   public function seeInDb($table, $fields)
   {
+    if (!$this->db) {
+      $this->test->setResponse('There is no connection with database! Please check Db module settings.','error');
+      return;
+    }
+
     // Find table in DB
     $table = preg_replace('/[^a-zA-Z0-9]/','',$table);
 

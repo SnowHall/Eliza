@@ -1,0 +1,5 @@
+name = Db
+description = "Acceptance testing with database."
+version = 0.1
+datestamp = "1349314869"
+

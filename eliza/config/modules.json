@@ -1,0 +1,1 @@
+{"db":{"enabled":false,"info":{"name":"Db","description":"Acceptance testing with database.","version":"0.1","datestamp":"1349314869"}},"error":{"enabled":true,"info":{"name":"Errors","description":"Check errors displayng on the HTML page.","version":"0.1","datestamp":"1349314869"}}}

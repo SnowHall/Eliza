@@ -1,129 +1,262 @@
 <?php
 /**
  * Eliza - Simple php acceptance testing framework
- * 
- * 
+ *
+ *
  * @author		SnowHall - http://snowhall.com
  * @website		http://elizatesting.com
  * @email		support@snowhall.com
- * 
- * @version		0.1.0
- * @date		March 8, 2013
- * 
+ *
+ * @version		0.2.0
+ * @date		April 18, 2013
+ *
  * Eliza - simple framework for BDD development and acceptance testing.
  * Eliza has user-friendly web interface that allows run and manage your tests from your favorite browser.
  *
  * Copyright (c) 2009-2013
  */
 
+/**
+ * Represents shelduer tasks
+ */
 class Task
 {
-  public static function getTasks()
+
+  // List of current tasks
+  public static $tasks;
+
+  /**
+   * Initialize tasks. Get tasks from storage (JSON)
+   *
+   * @return array Tasks
+   */
+  public static function init() {
+    if (!empty(self::$tasks)) return self::$tasks;
+    self::$tasks = Helpers::getFromJson(TASKS_FILE);
+    return self::$tasks;
+  }
+
+  /**
+   * Returns all current tasks
+   *
+   * @return array Tasks
+   */
+  public static function getAll() {
+    if (empty(self::$tasks)) self::init();
+
+    return self::$tasks;
+  }
+
+  /**
+   * Return task by Id
+   *
+   * @param int $id Task Id
+   * @return array Task
+   */
+  public static function get($id) {
+    if (!isset(self::$tasks[$id])) return;
+
+    return self::$tasks[$id];
+  }
+
+  /**
+   * Save task form
+   *
+   * @param type $form
+   * @return boolean
+   */
+  public static function saveForm($form)
   {
-    $tasks = array();
+    $task = array();
+    $task['name'] = $form['name'];
+    $task['lastUpdate'] = $form['lastUpdate'] ? base64_decode($form['lastUpdate']) : 'not run';
+    $task['periods'] = $form['periods'];
 
-    if (file_exists(TASKS_FILE)) {
-      $tasks = json_decode(file_get_contents(TASKS_FILE),true);
-    }
-    return $tasks;
-  }
+    switch ($task['periods'])
+    {
+      case 'hourly':
+        $task['hourly_hours'] = $form['hourly_hours'];
+        $task['hourly_minutes'] = $form['hourly_minutes'];
+        break;
 
-  public static function saveTask($form = '')
-  {
-    global $config;
+      case 'daily':
+        $task['daily_days'] = serialize($form['daily_days']);
+        $task['daily_runtime'] = $form['daily_runtime'];
+        break;
 
-    if ($form) {
-      $task = array();
-      $task['name'] = $form['name'];
-      $task['executionType'] = $form['executionType'][0];
-      $task['lastUpdate'] = $form['lastUpdate'] ? $form['lastUpdate'] : time();
+      case 'weekly':
+        $task['weekly_days'] = $form['weekly_days'];
+        $task['weekly_runtime'] = $form['weekly_runtime'];
+        break;
 
-      switch ($task['executionType'])
-      {
-        case 'period':
-          // Delete minutes for run test in 00:00
-          $lastUpdate = getdate($task['lastUpdate']);
-          $task['lastUpdate'] = $form['lastUpdate'] ? $form['lastUpdate'] - $lastUpdate['minutes'] * 60 : $task['lastUpdate'] - $lastUpdate['minutes'] * 60;
-          $task['period'] = $form['period'];
-          break;
+      case 'monthly':
+        $task['monthly_days'] = $form['monthly_days'];
+        $task['monthly_runtime'] = $form['monthly_runtime'];
+        break;
 
-        case 'intime':
-          $task['lastUpdate'] = $form['lastUpdate'] ? $form['lastUpdate'] : strtotime($_POST['Task']['runtime']);
-          $task['periodType'] = $form['periodType'][0];
-          $task['runtime'] = $form['runtime'];
-
-          switch ($task['periodType'])
-          {
-            case 'manual':
-              $task['intimePeriod'] = $form['intimePeriod'] * 24 * 3600;
-              break;
-
-            case 'daily':
-              $task['intimePeriod'] = 24 * 3600;
-              break;
-
-            case 'weekly':
-              $task['intimePeriod'] = 24 * 7 * 3600;
-              break;
-
-            default:
-              $task['intimePeriod'] = 24 * 3600;
-              break;
-          }
-          break;
-
-        default:
-          return false;
-      }
-
-      if ($form['sendEmail']) {
-        $task['sendEmail'] = 1;
-        $task['email'] = $form['email'];
-      }
-      if (isset($form['tests'])) {
-        foreach($form['tests'] as $test) {
-          $task['tests'][] = $test;
-        }
-      }
-      if (isset($form['groups'])) {
-        foreach($form['groups'] as $group) {
-          $task['groups'][] = $group;
-        }
-      }
-      $id = $form['taskId'] ? $form['taskId'] : substr(md5(uniqid()),2,6);
-      $config['tasks'][$id] = $task;
+      default:
+        return false;
     }
 
-    return self::saveAllTasks();
+    if ($form['sendEmail']) {
+      $task['sendEmail'] = 1;
+      $task['email'] = $form['email'];
+    }
+
+    if ($form['created']) {
+      $task['created'] = base64_decode($form['created']);
+    }
+    else {
+      $date = new DateTime(null, new DateTimeZone(Timezone::getTimezonByOffset(Config::getValue('timezone'))));
+      $task['created'] = $date->format('Y-m-d H:i:s');
+    }
+
+    if (isset($form['tests'])) {
+      foreach($form['tests'] as $test) {
+        $task['tests'][] = $test;
+      }
+    }
+    if (isset($form['groups'])) {
+      foreach($form['groups'] as $group) {
+        $task['groups'][] = $group;
+      }
+    }
+    $id = $form['taskId'] ? $form['taskId'] : substr(md5(uniqid()),2,6);
+
+    return self::save($task, $id);
   }
 
-  public static function saveAllTasks() {
-    global $config;
+  /**
+   * Save task by Id
+   *
+   * @param type $task Task info
+   * @param type $id Task Id. Will be generated if not specified
+   * @return boolean
+   */
+  public static function save($task, $id = null) {
+    if (!$id) $id = substr(md5(uniqid()),2,6);
 
-    return file_put_contents(TASKS_FILE, json_encode($config['tasks']));
+    self::$tasks[$id] = $task;
+    return self::saveAll();
   }
 
-  public static function taskValidate($form)
+  /**
+   * Save all tasks
+   *
+   * @return boolean
+   */
+  public static function saveAll() {
+    return file_put_contents(TASKS_FILE, json_encode(self::$tasks));
+  }
+
+  /**
+   * Delete task by Id
+   *
+   * @param int $id Task Id
+   * @return boolean
+   */
+  public static function delete($id) {
+    if (!$id || !isset(self::$tasks[$id])) return false;
+
+    unset(self::$tasks[$id]);
+    return self::saveAll();
+  }
+
+  /**
+   * Remove test from task
+   *
+   * @param type $taskId Task Id
+   * @param type $testId Test name
+   * @return boolean
+   */
+  public static function removeTest($taskId, $testId) {
+    $taskTests = self::$tasks[$taskId]['tests'];
+    // If test not in the group - return
+    if (!in_array($testId, $taskTests)) return;
+
+    $key = array_search($testId,$taskTests);
+    unset(self::$tasks[$taskId]['tests'][$key]);
+    self::saveAll();
+  }
+
+	/**
+   * Remove group from task
+   *
+   * @param type $taskId Task Id
+   * @param type $grouptId Group id
+   * @return boolean
+   */
+  public static function removeGroup($taskId, $groupId) {
+    $taskGroup = self::$tasks[$taskId]['groups'];
+    // If test not in the group - return
+    if (!in_array($groupId, $taskGroup)) return;
+
+		$key = array_search($groupId, $taskGroup);
+    unset(self::$tasks[$taskId]['groups'][$key]);
+    self::saveAll();
+  }
+
+  public static function updateField($id, $field, $value) {
+    self::$tasks[$id][$field] = $value;
+    self::saveAll();
+  }
+
+  /**
+   * Validate task form
+   *
+   * @param type $form
+   * @return string
+   */
+  public static function validate($form)
   {
     $errors = array();
 
     if (empty($form['name'])) {
       $errors['name'] = 'Field "Task Name" shouldn\'t be empty';
     }
-    if (isset($form['executionType']) && ($form['executionType'][0] == 'period') && empty($form['period'])) {
-      $errors['period'] = 'Field "Each hours" shouldn\'t be empty';
+    switch ($form['periods'])
+    {
+      case 'hourly':
+        if (empty($form['hourly_hours'])) $errors['hourly_hours'] = 'Field "Run every _ hours" shouldn\'t be empty';
+        if (empty($form['hourly_minutes'])) $errors['hourly_minutes'] = 'Field "Run In" shouldn\'t be empty';
+        break;
+
+      case 'daily':
+        if (empty($form['daily_days'])) $errors['daily_days'] = 'You should choose at least one day of week';
+        if (empty($form['daily_runtime'])) $errors['daily_runtime'] = 'Field "Start time" shouldn\'t be empty';
+        if (!preg_match('/^[0-9]{1,2}:[0-9]{1,2}$/',$form['daily_runtime'])) $errors['daily_runtime'] = 'Field "Start time" should be in format 00:00';
+        break;
+
+      case 'weekly':
+        if (empty($form['weekly_days'])) $errors['weekly_days'] = 'You should choose the day of week';
+        if (empty($form['weekly_runtime'])) $errors['weekly_runtime'] = 'Field "Start time" shouldn\'t be empty';
+        if (!preg_match('/^[0-9]{1,2}:[0-9]{1,2}$/',$form['weekly_runtime'])) $errors['weekly_runtime'] = 'Field "Start time" should be in format 00:00';
+        break;
+
+      case 'monthly':
+        if (empty($form['monthly_days'])) $errors['monthly_days'] = 'You should choose the day of week';
+        if (empty($form['monthly_runtime'])) $errors['monthly_runtime'] = 'Field "Start time" shouldn\'t be empty';
+        if (!preg_match('/^[0-9]{1,2}:[0-9]{1,2}$/',$form['monthly_runtime'])) $errors['monthly_runtime'] = 'Field "Start time" should be in format 00:00';
+        break;
+
+      default:
+        $errors['periods'] = 'Choose valid period for test running';
     }
-    if ($form['sendEmail'] && empty($form['email'])) {
-      $errors['email'] = 'Field "Start from" shouldn\'t be empty';
-    }
-    if ($form['sendEmail'] && !preg_match('/^[a-zA-Z0-9]+(?:\.[a-zA-Z0-9]+)*@(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?\.)+[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?$/',$form['email'])) {
-      $errors['email'] = 'Enter correct email.';
-    }
-    if (isset($form['executionType']) && ($form['executionType'][0] == 'intime') && ($form['periodType'][0] == 'manual') && empty($form['intimePeriod'])) {
-      $errors['intimePeriod'] = 'Field "Manual period" shouldn\'t be empty';
-    }
-    if (isset($form['runtime']) && !preg_match('/^[0-9]{1,2}:[0-9]{1,2}$/',$form['runtime'])) {
-      $errors['runtime'] = 'Field "Run in" should be in format 00:00';
+    if ($form['sendEmail']) {
+      $form['email'] = rtrim(trim($form['email']),';');
+
+      if(empty($form['email'])) {
+        $errors['email'] = 'Field "Email" shouldn\'t be empty';
+      }
+      else {
+        $emails = explode(';',$form['email']);
+        foreach ($emails as $email) {
+          if (!Form::emailValidate(trim($email))) {
+            $errors['email'] = 'Enter correct emails.';
+            break;
+          }
+        }
+      }
     }
     if (!isset($form['tests']) && !isset($form['groups'])) {
       $errors['assign-tests'] = 'At least one group or one test should be choosen.';

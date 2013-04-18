@@ -51,20 +51,7 @@ $(document).ready(function() {
      $('div.alert').hide();
    });
 
-   $('#sendEmail').click(function(){
-     if ($('#sendEmail').is(':checked')) $('#emailInput').removeAttr('disabled');
-     else $('#emailInput').attr('disabled','disabled');
-   });
-
-   $('#checkAllTests').click(function(){
-      $(".test-assign input[type='checkbox']").attr('checked', $('#checkAllTests').is(':checked'));
-   });
-
-   $('#checkAllGroups').click(function(){
-      $(".group-assign input[type='checkbox']").attr('checked', $('#checkAllGroups').is(':checked'));
-   });
-
-   $('.executionType').click(function(){
+   /*$('.executionType').click(function(){
      if ($(this).val() == 'intime') {
        $('.period input:not(.executionType)').each(function(index,el){$(el).attr('disabled','disabled')});
        $('.intime input:not(.executionType)').each(function(index,el){$(el).removeAttr('disabled')});
@@ -73,6 +60,14 @@ $(document).ready(function() {
        $('.intime input:not(.executionType)').each(function(index,el){$(el).attr('disabled','disabled')});
        $('.period input:not(.executionType)').each(function(index,el){$(el).removeAttr('disabled')});
      }
+   });*/
+
+   $("input:radio[name='Task[periods]']").click(function(){
+     $('.run-type').css('display','none');
+     if ($(this).val() === 'hourly') { $('#hourly').css('display','block'); }
+     else if ($(this).val() === 'daily') { $('#daily').css('display','block'); }
+     else if ($(this).val() === 'weekly') { $('#weekly').css('display','block'); }
+     else if ($(this).val() === 'monthly') { $('#monthly').css('display','block'); }
    });
 });
 
@@ -81,7 +76,7 @@ function getRunTestPopup(test) {
       type: 'POST',
       url: 'index.php?r=test/getrunpopup&ajax=1',
       data: ({
-        'test': test
+        test: test
       }),
       success: function(data){
          $('.add-test-modal').html(data);
@@ -104,8 +99,8 @@ function run_test(url,testUrl) {
       url: url,
       dataType: 'json',
       data: ({
-        'responseFormat': 'json',
-        'testUrl' : testUrl
+        responseFormat: 'json',
+        testUrl : testUrl
       }),
       success:  function(data) {
         if (data.error || data == '') {
@@ -120,7 +115,7 @@ function run_test(url,testUrl) {
         result.html(data.response);
       },
       error: function(data, message) {
-        alert(message);
+        result.html(data);
       }
  });
 }
@@ -130,7 +125,7 @@ function addTestPopup(group) {
       type: 'POST',
       url: 'index.php?r=group/getaddpopup&ajax=1',
       data: ({
-        'group': group
+        group: group
       }),
       success: function(data){
          $('.add-test-modal').html(data);
@@ -149,8 +144,8 @@ function removeTestFromGroup(id, test) {
       type: 'POST',
       url: 'index.php?r=group/removetest&ajax=1',
       data: ({
-        'group': id,
-        'test': test
+        group: id,
+        test: test
       }),
       success: function(data){
          window.location.reload();
@@ -169,8 +164,28 @@ function removeTestFromTask(id, test) {
       type: 'POST',
       url: 'index.php?r=task/removetest&ajax=1',
       data: ({
-        'task': id,
-        'test': test
+        task: id,
+        test: test
+      }),
+      success: function(data){
+         window.location.reload();
+      },
+      error: function(data, msg){
+        alert(msg);
+      }
+    });
+  }
+}
+
+function removeGroupFromTask(id, group) {
+  if (confirm('Do you want remove group from task?'))
+  {
+    jQuery.ajax({
+      type: 'POST',
+      url: 'index.php?r=task/removegroup&ajax=1',
+      data: ({
+        task: id,
+        group: group
       }),
       success: function(data){
          window.location.reload();
@@ -187,7 +202,7 @@ function getAddToQueuePopup(test) {
       type: 'POST',
       url: 'index.php?r=test/getaddqueuepopup&ajax=1',
       data: ({
-        'test': test
+        test: test
       }),
       success: function(data){
          $('.add-test-modal').html(data);
@@ -206,12 +221,10 @@ function addTestToQueue (url, testUrl) {
     type: 'POST',
     url: url,
     data: ({
-        'testUrl': testUrl
+        testUrl: testUrl
     }),
     success: function(data){
       window.location.reload();
-        /*$('.add-test-modal').html(data);
-        $('.add-test-modal').show(300);*/
     },
     error: function(data, msg){
       alert(msg);
@@ -224,21 +237,19 @@ function addUrlInput() {
   $('#config-form #urls tr:last').after('<tr><td class="radio"><input type="radio" name="defaultUrl" value="'+lastValue+'" /></td><td><input type="text" name="urls[]" /><a class="urlRemove" href="javascript:void(0);">Remove</a></td></tr>');
 }
 
-/*function showMoreHistory(id) {
-   if ($('.more-info-'+id).html().replace(/^\s+|\s+$/g, '').length == 0) {
-     jQuery.ajax({
-       type: 'POST',
-       url: 'index.php?r=history/getmore&ajax=1',
-       data: ({
-         'id': id
-       }),
-       success: function(data){
-         $('.more-info-'+id).html(data);
-         $('.more-info-'+id).show(300);
-       },
-       error: function(data, msg){
-         alert(msg);
+function showModuleConfigPopup(module) {
+  jQuery.ajax({
+      type: 'POST',
+      url: 'index.php?r=modules/getconfigpopup&ajax=1',
+      data: ({
+        module: module
+      }),
+      success: function(data){
+         $('.config-modal').html(data);
+         $('.config-modal').show(300);
+      },
+      error: function(data, msg){
+        alert(data);
       }
-    });
-  }
-}*/
+ });
+}

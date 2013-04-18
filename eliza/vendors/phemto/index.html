@@ -1,0 +1,595 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>Dependency injection for PHP : The ten minute guide to Phemto</title>
+<link rel="stylesheet" type="text/css" href="docs/bundled.css" title="Styles">
+</head>
+<body>
+<div class="menu_back"><div class="menu"><a href="index.html">Phemto</a></div></div>
+<h1>Ten minute guide to Phemto</h1>
+        This page...
+        <ul>
+<li>
+            Guide to <a href="#what_is_phemto">Dependency Injection</a>?
+        </li>
+<li>
+            <a href="#installing_phemto">Installation</a> from the tarball.
+        </li>
+<li>
+            <a href="#using_phemto">Using Phemto</a> in your application.
+        </li>
+<li>
+            The <a href="#wiring">wiring syntax</a>.
+        </li>
+</ul>
+<div class="content">
+        <h2>
+<a class="target" name="what_is_phemto"></a>The five minute guide to Dependency Injection</h2>
+            <p>
+                In jargon speak, <em>Phemto</em> is a lightweight, highly automated,
+                dependency injection container.
+                In simpler terms, <em>Phemto</em>'s job is to instantiate objects from as
+                little information as possible; dramatically reducing coupling within
+                an application or framework.
+            </p>
+            <p>
+                Why is this useful?
+            </p>
+            <p>
+                The easiest way to understand is to think of "Dependency Injection"
+                is as being at one end of a scale with hard coding at the other end.
+                The following is a short journey through hard coding, the <em>Factory</em>
+                pattern, the <em>Registry</em> pattern, the <em>Service Locator</em> pattern
+                and finally on to DI.
+                If you already know what dependency injection is already, then skip to
+                <a href="#installing_phemto">installing Phemto</a>.
+            </p>
+            <p>
+                Creating objects in your application with hard coded <span class="new_code">new</span>
+                statements is very explicit, but it makes things difficult to change later.
+                Take this code...
+<pre>
+class MyController {
+    function __construct() {
+        ...
+        $connection = <strong>new MysqlConnection()</strong>;
+    }
+}
+</pre>
+                Here <span class="new_code">MyController</span> has a dependency on <span class="new_code">MysqlConnection</span>.
+            </p>
+            <p>
+                The <span class="new_code">new</span> operator is easy to understand, but <span class="new_code">MyController</span>
+                can only ever use a MySQL database.
+                Recoding it to allow subclassing hardly helps, because that will expose other
+                parts of the implementation that will tie you in.
+                Anyway, multiple dependencies will defeat inheritance by causing a class explosion.
+                You can only play the inheritance card once.
+            </p>
+            <p>
+                The next step up is to use a <em>Factory</em>...
+<pre>
+class MyController {
+    function __construct(<strong>$connection_pool</strong>) {
+        ...
+        $connection = <strong>$connection_pool-&gt;getConnection()</strong>;
+    }
+}
+</pre>
+                This is a very effective solution.
+                The factory can be set to a certain connection type, either explicitely
+                or by using a configuration file.
+                Factories often create whole families of objects, when they are known as
+                <em>Abstract Factory</em> or <em>Repository</em>.
+                There are limitations though.
+            </p>
+            <p>
+                Factories can introduce a lot of extra code.
+                If you want to unit test the classes with mock objects, you will need to
+                mock not just the dependency, but the factory as well.
+                That's quite a bit of test clutter.
+            </p>
+            <p>
+                Even in live code, if you want to create an object the factory author
+                has not thought of, then you have to subclass or rewrite the factory.
+                For frameworks this can be a big problem.
+            </p>
+            <p>
+                The next step on the decoupling road is to take construction out of
+                the client objects altogether, doing the whole lot up front...
+<pre>
+class MyController {
+    function __construct(<strong>$registry</strong>) {
+        ...
+        $connection = <strong>$registry-&gt;connection</strong>;
+    }
+}
+...
+$registry = new Registry();
+$registry-&gt;connection = new MysqlConnection();
+...
+$controller = new MyController(<strong>$registry</strong>);
+</pre>
+                The <span class="new_code">Registry</span> is pretty passive, and so the application now has
+                to get involved in creating, or overriding, lot's of objects.
+                You may also end up instantiating objects that don't get used.
+                This pattern is not enough if you want to use lazy object creation, or
+                want something other than a <em>Singleton</em>, or some other
+                object lifecycle.
+            </p>
+            <p>
+                Worse, if a dependency has other dependencies that need to be handled
+                with the <em>Registry</em>, the setting up can get very tangled.
+            </p>
+            <p>
+                We can make the <em>Registry</em> pattern more sophisticated it if we
+                allow it to instantiate objects.
+                It then becomes a <em>Service Locator</em>...
+<pre>
+class MyController {
+    function __construct(<strong>$services</strong>) {
+        ...
+        $connection = <strong>$services-&gt;connection</strong>;
+    }
+}
+...
+$services = new ServiceLocator();
+$services-&gt;connection('MysqlConnection');
+...
+$controller = new MyController(<strong>$services</strong>);
+</pre>
+                Now the wiring can be set in any order, but the <span class="new_code">ServiceLocator</span>
+                needs to know how to create the <span class="new_code">MysqlConnection</span>.
+                This can be handled by registering factories or with clever reflection tricks,
+                although passing parameters can become fiddly.
+                Lifecycles are fully under the control of the application programmer,
+                either by coding the factory methods or with some plug-in or configuration
+                option.
+            </p>
+            <p>
+                Unfortunately this near panacea shares a problem with the <em>Registry</em>.
+                Every class that uses an interface this way has to have the
+                <span class="new_code">ServiceLocator</span> as a dependency, which is intrusive.
+                If you try to mix two systems with different <em>Service Locator</em>s, you
+                are out of luck.
+            </p>
+            <p>
+                <em>Dependency Injection</em> starts on a different track.
+                Let's go back to our first example...
+<pre>
+class MysqlConnection { ... }
+
+class MyController {
+    function __construct() {
+        ...
+        $connection = new MysqlConnection();
+    }
+}
+</pre>
+                ...and make the dependency external...
+<pre>
+class MysqlConnection { ... }
+
+class MyController {
+    function __construct(<strong>Connection $connection</strong>) {
+        ...
+    }
+}
+</pre>
+                At first sight this looks terrible, as now every top level script has to
+                know the dependencies.
+                Changing the database connection will now have to be done in hundreds of
+                places.
+                Well, that would be true if we had to use <span class="new_code">new</span>...
+<pre>
+$injector = new Phemto();
+$controller = $injector-&gt;<strong>create</strong>('MyController');
+</pre>
+                Believe it or not, this is all that's needed.
+            </p>
+            <p>
+                <span class="new_code">Phemto</span> is specialised in discovering how
+                to create classes, and automates a surprising amount.
+                Just from the interface hint, it can deduce the class that
+                <span class="new_code">MysqlConnection</span> is the only candidate to
+                fulfil the <span class="new_code">Connection</span> type hint.
+            </p>
+            <p>
+                More complicated situations can require additional hinting,
+                normally placed in a "wiring file".
+                To give you a flavour, here is a real life wiring file...
+<pre>&lt;?php
+require_once('phemto/phemto.php');
+
+$injector = new Phemto();
+$injector-&gt;whenCreating('Page')-&gt;forVariable('session')-&gt;willUse(new Reused('Session'));
+$injector-&gt;whenCreating('Page')-&gt;forVariable('continuation')-&gt;willUse('Continuation');
+$injector-&gt;whenCreating('Page')-&gt;forVariable('alerts')-&gt;willUse('Alert');
+$injector-&gt;whenCreating('Page')-&gt;forVariable('accounts')-&gt;willUse('Accounts');
+$injector-&gt;whenCreating('Page')-&gt;forVariable('mailer')-&gt;willUse('Mailer');
+$injector-&gt;whenCreating('Page')-&gt;forVariable('clock')-&gt;willUse('Clock');
+$injector-&gt;whenCreating('Page')-&gt;forVariable('request')-&gt;willUse('Request');
+return $injector;
+?&gt;</pre>
+                This amount of configuration is typical for a medium sized project.
+            </p>
+            <p>
+                Now the controller specifies only an interface, and
+                the job of instantiation has been handed to an intermediary.
+                The <span class="new_code">MyController</span> is no longer needs to know about the
+                <span class="new_code">MysqlConnection</span>.
+                Instead the <span class="new_code">$injector</span> has to know about both.
+                This is <a href="http://martinfowler.com/bliki/InversionOfControl.html">Inversion of Control</a>.
+            </p>
+        
+        <h2>
+<a class="target" name="installing_phemto"></a>Installing Phemto</h2>
+            <p>
+                The phemto download is a pure PHP tarball.
+                Simply untar it...
+                <pre class="shell">tar -zxf phemto_0.1_alpha6.tar.gz</pre>
+                You can then <span class="new_code">require_once()</span> the <em>phemto.php</em> file
+                directly, or place the phemto folder in your path.
+            </p>
+            <p>
+                Phemto's only dependency is on the PHP reflection API.
+            </p>
+        
+        <h2>
+<a class="target" name="using_phemto"></a>Using Phemto</h2>
+            <p>
+                The expected use case for Phemto is in the top level of an application
+                or framework.
+            </p>
+            <p>
+                Firstly you write your classes as normal...
+<pre>
+class Permissions { ... }
+
+class Authentication {
+    function __construct($permissions) { ... }
+}
+
+class MyPage implements Page {
+    function __construct($authentication) { ... }
+}
+</pre>
+                This is a simple <em>Page controller</em> architecture.
+                We can unit test <span class="new_code">Page</span> fairly easily, because it's
+                <span class="new_code">Authentication</span> dependency is passed in the constructor.
+                We can use a mock version for testing, and just concentrate on the
+                page logic.
+            </p>
+            <p>
+                Next we create an application wiring file, let's call it
+                "wiring.php", that includes all the configuration for
+                this application...
+<pre>
+&lt;?php
+require_once('phemto/phemto.php');
+
+$injector = new Phemto();
+$injector-&gt;<strong>forVariable</strong>('authentication')-&gt;<strong>willUse</strong>('Authentication');
+$injector-&gt;<strong>whenCreating</strong>('Authentication')
+         -&gt;<strong>forVariable</strong>('permissions')-&gt;<strong>willUse</strong>(new <strong>Sessionable</strong>('Permissions'));
+return $injector;
+?&gt;
+</pre>
+                Here we tell the dependency injector that whenever we see the variable
+                <span class="new_code">$authentication</span> we want to create an instance of
+                <span class="new_code">Authentication</span>.
+                The <span class="new_code">$permissions</span> object has a different lifecycle though.
+                <span class="new_code">Sessionable</span> says that if possible it will be read from the session,
+                otherwise it will be created just once.
+                More on the wiring syntax and lifecycles in the next section.
+            </p>
+            <p>
+                Our top level scripts now swap their <span class="new_code">new</span> statements
+                for <em>Phemto</em> factory calls...
+<pre>
+&lt;?php
+require_once('lib/my_page.php');
+
+$injector = include('wiring.php');
+$page = $injector-&gt;<strong>create</strong>('Page');
+?&gt;
+&lt;html&gt;...&lt;/html&gt;
+</pre>
+                So isolated is our code from the top level scripts, that we can
+                add and remove dependencies to the underlying classes without ever
+                again having to alter our top level scripts.
+            </p>
+            <p>
+                Framework authors have different concerns.
+                As they probably already have a central point for creating pages, their
+                main concern is with adapting to your components.
+            </p>
+            <p>
+                Suppose we want write an <span class="new_code">Authentication</span> implementation
+                based on an interface supplied by the framework...
+<pre>
+interface Authentication { ... }
+
+class InternalFrontControllerActionChainThingy {
+    function __construct(Authentication $authentication, ...) { ... }
+}
+</pre>
+                Our component wants to use the same database connection
+                as the framework, but we also want to add a third party caching component.
+<pre>
+require_once('cache.php');
+
+class OurAuthentication implements Authentication {
+    function __construct(Database <strong>$database</strong>, DatabaseCache <strong>$cache</strong>) { ... }
+}
+</pre>
+                For a factory based framework this is a bit of a nightmare, as the
+                framework will not know how to create the caching component or where to
+                put it.
+                Requiring us to pass a factory to the framework is not enough, as the
+                framework still has to be able to give us
+                If the framework is using <em>Dependency Injection</em>, then this is just
+                an amendment to the wiring.
+            </p>
+            <p>
+                This wiring could be amended directly, with a user supplied wiring file...
+<pre>
+&lt;?php
+$injector = <strong>include('framework/wiring.php')</strong>;
+$injector-&gt;willUse('OurAuthenticator');
+return $injector;
+?&gt;
+</pre>
+                More likely the framework will wrap the DI tool within it's own registration
+                system...
+<pre>
+class FrameworkRegistration {
+    ...
+    static function <strong>register($class, $dependencies = array())</strong> {
+        $this-&gt;injector-&gt;whenCreating('Controller')-&gt;willUse($class);
+        foreach (dependencies as $dependency) {
+            $this-&gt;injector-&gt;whenCreating('Controller')
+                           -&gt;whenCreating($class)
+                           -&gt;willUse($dependency);
+        }
+    }
+}
+</pre>
+                We could then call it with...
+<pre>
+FrameworkRegistration::<strong>register('OurAuthentication', array('DatabaseCache'))</strong>;
+</pre>
+            </p>
+        
+        <h2>
+<a class="target" name="wiring"></a>Wiring with Phemto</h2>
+            <p>
+                The simplest way Phemto creates objects is straight from the class name...
+<pre>
+<strong>class</strong> Porsche911 { }
+
+$injector = new Phemto();
+$car = $injector-&gt;create('Porsche911');
+</pre>
+                It will search the classes currently registered by the system to
+                find a match.
+            </p>
+            <p>
+                If only one class could possibly match, then it will be instantiated
+                straight away.
+                In doing so, <em>Phemto</em> is smart enough to understand abstract
+                classes and interfaces...
+<pre>
+<strong>abstract</strong> class Car { }
+class Porsche911 extends Car { }
+
+$injector = new Phemto();
+$car = $injector-&gt;create('Car');
+</pre>
+                Here <span class="new_code">$car</span> is an instance of <span class="new_code">Porsche911</span>.
+                Similarily...
+<pre>
+<strong>interface</strong> Transport { }
+class Porsche911 implements Transport { }
+
+$injector = new Phemto();
+$car = $injector-&gt;create('Transport');
+</pre>
+                Again, the concrete <span class="new_code">Porsche911</span> is created, as it's the
+                only option.
+            </p>
+            <p>
+                If there is ambiguity, then <em>Phemto</em> will throw an exception.
+                The ambiguity can be resolved by giving Phemto additional wiring...
+<pre>
+interface Transport { }
+class Porsche911 implements Transport { }
+class RouteMaster implements Transport { }
+
+$injector = new Phemto();
+$injector-&gt;<strong>willUse</strong>('Porsche911');
+$car = $injector-&gt;create('Transport');
+</pre>
+                This is handy if there is a default implementation that you now want
+                to override, but the original is still in scope.
+            </p>
+            <p>
+                <em>Phemto</em> has two methods to automatically instantiate parameters.
+                The first is by type hints...
+<pre>
+interface Engine { }
+
+class Porsche911 {
+    function __construct(<strong>Engine</strong> $engine) { }
+}
+
+class Flat6 implements Engine { }
+
+$injector = new Phemto();
+$car = $injector-&gt;create('Porsche911');
+</pre>
+                This is equivalent to <span class="new_code">new Porsche911(new Flat6())</span>.
+                This technique is useful for framework authors, who only have to expose
+                interface names.
+            </p>
+            <p>
+                Notice that we have not had to change the client code, even though
+                we've changed the constructor signature.
+            </p>
+            <p>
+                The other way <em>Phemto</em> can fill parameters is by variable name...
+<pre>
+class Porsche911 {
+    function __construct($engine) { }
+}
+
+interface Engine { }
+class Flat6 implements Engine { }
+
+$injector = new Phemto();
+$injector-&gt;<strong>forVariable</strong>('engine')-&gt;<strong>willUse</strong>('Engine');
+$car = $injector-&gt;create('Porsche911');
+</pre>
+                Again we instantiate <span class="new_code">$car</span> to <span class="new_code">new Porsche911(new Flat6())</span>.
+                Here we've chosen the variable <span class="new_code">$engine</span> to map to an interface.
+                Phemto can apply it's automation rules from there.
+            </p>
+            <p>
+                Sometimes instance specific parameters need to be passed at construction time.
+                The simplest way to do this is just add them to the create method...
+<pre>
+class Porsche911 {
+    function __construct(<strong>$fluffy_dice</strong>, <strong>$nodding_dog</strong>) { }
+}
+
+$injector = new Phemto();
+$car = $injector-&gt;create('Porsche911', <strong>true</strong>, <strong>false</strong>);
+</pre>
+                These parameters will fill unfulfilled slots in the constructors, here
+                giving <span class="new_code">new Porsche911(true, false)</span>.
+            </p>
+            <p>
+                As unnamed parameters can be a bit error prone when things get complicated,
+                there is a named parameter option as well...
+<pre>
+class Porsche911 {
+    function __construct($fluffy_dice, $nodding_dog) { }
+}
+
+$injector = new Phemto();
+$car = $injector-&gt;<strong>fill</strong>('fluffy_dice', 'nodding_dog')
+                -&gt;<strong>with</strong>(true, false)
+                -&gt;create('Porsche911', true);
+</pre>
+                These parameters apply to dependencies as well.
+            </p>
+            <p>
+                <em>Phemto</em> can call methods other than the constructor...
+<pre>
+interface Seat { }
+interface SportsCar { }
+
+class Porsche911 implements SportsCar {
+    function <strong>fitDriversSeat</strong>(Seat $seat) { }
+}
+
+class BucketSeat implements Seat { }
+
+$injector = new Phemto();
+$injector-&gt;<strong>forType</strong>('SportsCar')-&gt;<strong>call</strong>('fitDriversSeat');
+$car = $injector-&gt;create('Porsche911');
+</pre>
+                This code is the same as...
+<pre>
+$car = new Porsche911();
+$car-&gt;<strong>fitDriversSeat</strong>(new BucketSeat());
+</pre>
+                Calling non-constructor methods in this way is called setter injection.
+            </p>
+            <p>
+                You don't always want to create the same object.
+                Sometimes the choice depends on context...
+<pre>
+interface Seat { }
+
+class Car {
+    function __construct(Seat $seat) { }
+}
+class FordEscort extends Car;
+class Porsche911 extends Car;
+
+class StandardSeat implements Seat { }
+class BucketSeat implements Seat { }
+
+$injector = new Phemto();
+$injector-&gt;<strong>willUse</strong>('StandardSeat');
+$injector-&gt;<strong>whenCreating</strong>('Porsche911')-&gt;<strong>willUse</strong>('BucketSeat');
+$car = $injector-&gt;create('Porsche911');
+</pre>
+                This ensures that the default <span class="new_code">$seat</span> is the
+                <span class="new_code">StandardSeat</span> class, but that the <span class="new_code">Porsche911</span>
+                will use the <span class="new_code">BucketSeat</span>.
+            </p>
+            <p>
+                The <span class="new_code">whenCreating()</span> method creates a whole new nested
+                version of <em>Phemto</em> so that context can be applied to all
+                of the preceding wiring methods. E.g...
+<pre>
+class Car {
+    function __construct($seat) { }
+}
+class FordEscort extends Car;
+class Porsche911 extends Car;
+
+class StandardSeat { }
+class BucketSeat { }
+
+$injector = new Phemto();
+$injector-&gt;willUse('StandardSeat');
+$injector-&gt;<strong>whenCreating</strong>('Porsche911')
+         -&gt;<strong>forVariable</strong>('seat')-&gt;<strong>willUse</strong>('BucketSeat');
+$car = $injector-&gt;create('Porsche911');
+</pre>
+            </p>
+            <p>
+                Any objects created through <em>Phemto</em> can have their lifecycles controlled.
+            </p>
+            <p>
+                <em>Phemto</em> ships with <span class="new_code">Factory</span> (the default) which always
+                creates a new instance, <span class="new_code">Reused</span> which shares a single instance,
+                and <span class="new_code">Sessionable</span> which persists the instance in the
+                PHP <span class="new_code">$_SESSION</span> variable.
+                These are all variants of the <span class="new_code">Lifecycle</span> abstract class.
+                The developer is free to extend this.
+            </p>
+            <p>
+                Here we create a single shared <span class="new_code">Porsche911</span> only...
+<pre>
+class Porsche911 { }
+
+$injector = new Phemto();
+$injector-&gt;willUse(new <strong>Reused</strong>('Porsche911'));
+$car = $injector-&gt;create('Porsche911');
+$same_car = $injector-&gt;create('Porsche911');
+</pre>
+                <span class="new_code">$car</span> and <span class="new_code">$same_car</span> both reference the
+                same object.
+                Porsches are rather expensive after all.
+            </p>
+        
+    </div>
+        References and related information...
+        <ul>
+<li>
+            Phemto project page on <a href="http://sourceforge.net/projects/phemto/">SourceForge</a>.
+        </li>
+<li>
+            Martin Fowler's <a href="http://martinfowler.com/articles/injection.html">description of DI</a>.
+        </li>
+</ul>
+<div class="menu_back"><div class="menu"><a href="index.html">Phemto</a></div></div>
+<div class="copyright">
+            Copyright<br>Marcus Baker 2008
+        </div>
+</body>
+</html>

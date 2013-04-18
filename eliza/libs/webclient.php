@@ -2,22 +2,22 @@
 
 /**
  * Eliza - Simple php acceptance testing framework
- * 
- * 
+ *
+ *
  * @author		SnowHall - http://snowhall.com
  * @website		http://elizatesting.com
  * @email		support@snowhall.com
- * 
- * @version		0.1.0
- * @date		March 8, 2013
- * 
+ *
+ * @version		0.2.0
+ * @date		April 18, 2013
+ *
  * Eliza - simple framework for BDD development and acceptance testing.
  * Eliza has user-friendly web interface that allows run and manage your tests from your favorite browser.
  *
  * Copyright (c) 2009-2013
  */
 
-class webClient
+class Webclient
 {
   public $first_checking = false;
   public $_redirect_url = '';
@@ -47,7 +47,7 @@ class webClient
 	{
 		/* check if zlib is available */
 		if (function_exists('gzopen')) {
-			$this->_usegzip = true;
+			//$this->_usegzip = true;
 		}
 
 		/* start time */
@@ -162,7 +162,7 @@ class webClient
     @stream_set_timeout($fp, $this->_timeout);
     $res = '';
     $i = 0;
-    while($c = @fread($fp, 11421772))
+    while($c = @fread($fp, 5421772))
     {
         $res .= $c;
         $i++;
@@ -624,15 +624,14 @@ class webClient
 
       preg_match_all('/<select[^>]+name\s*=\s*(?(?=[\'\"])[\'\"]([^>]+)[\'\"]|\b([^>]+)\b)[^>]*>(.*)<\/select>/siU', $v, $a);
 
+      $select = array();
       if (!empty($a[1])) {
-        $select = array();
         foreach($a[1] as $num=>$key) {
           preg_match_all('/<option[^>]+value\s*=\s*(?(?=[\'\"])[\'\"]([^>]+)[\'\"]|\b([^>]+)\b)[^>]*>(.*)<\/option>/siU',$a[3][$num],$optionsParts);
           $options = array();
           foreach($optionsParts[1] as $optNum=>$optKey) {
             $options[$optKey] = $optionsParts[3][$optNum];
           }
-
           if ($key == '') $key = $a[2][$num];
           $select[$key] = $options;
         }
@@ -677,7 +676,7 @@ class webClient
 					continue;
 
 				/* cool */
-				$key = $element['name'] == '' ? $element['id'] : $element['name'];
+				$key = !empty($element['name']) ? $element['name'] : $element['id'];
 				$res[$key] = isset($element['value']) ? html_entity_decode($element['value']) : '';
 			}
 

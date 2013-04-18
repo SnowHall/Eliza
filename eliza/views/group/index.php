@@ -1,5 +1,5 @@
 <div class="group">
-  <a href="<?php echo url('group/create') ?>">
+  <a href="<?php echo $this->url('group/create') ?>">
     <button class="btn">Create Group</button>
   </a>
   <div class="alert"></div>
@@ -22,12 +22,12 @@
             <a href="javascript:void(0);" onclick="addTestPopup('<?php echo $id; ?>')">Add test</a>
           </td>
           <td class="run span1">
-            <a onclick="run_test('<?php echo url('test/run',array('ajax'=>'1','group'=>$id)) ?>'); return false;" href="#">
+            <a onclick="run_test('<?php echo $this->url('test/run',array('ajax'=>'1','group'=>$id)) ?>'); return false;" href="#">
             <span class="icon-play"></span>
           </td>
           <td class="buttons">
-            <a href="<?php echo url('group/view',array('id'=>$id)) ?>"><span class="icon-search"></span></a>
-            <a class="confirm" href="<?php echo url('group/delete',array('id'=>$id)) ?>"><span class="icon-remove"></span></a>
+            <a href="<?php echo $this->url('group/view',array('id'=>$id)) ?>"><span class="icon-search"></span></a>
+            <a class="confirm" href="<?php echo $this->url('group/delete',array('id'=>$id)) ?>"><span class="icon-remove"></span></a>
           </td>
 
         </tr>

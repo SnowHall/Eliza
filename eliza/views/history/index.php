@@ -1,5 +1,5 @@
 <div class="history">
-  <a href="<?php echo url('history/clear') ?>" class="confirm">
+  <a href="<?php echo $this->url('history/clear') ?>" class="confirm">
     <button class="btn">Clear History</button>
   </a>
   <?php if ($history): ?>
@@ -22,7 +22,7 @@
               <span class="result result-test <?php echo $entry->error ? 'error' : 'success' ?>"><?php
                 echo $entry->error ? 'Failed' : 'Success' ?>
               </span>
-              <span class="title"><a href="<?php echo url('test/view',array('test'=>'auth')) ?>"><?php echo ucfirst($entry->name) ?></a></span>
+              <span class="title"><a href="<?php echo $this->url('test/view',array('test'=>  strtolower($entry->name))) ?>"><?php echo ucfirst($entry->name) ?></a></span>
               <span class="date"><?php echo date('j M Y, H:i',strtotime($entry->date)) ?></span>
               <span class="date"><?php echo round($entry->executionTime,2).'s' ?></span>
               <span><a class="more" href="javascript:void(0);">Show More</a></span>

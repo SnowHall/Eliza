@@ -1,15 +1,15 @@
 <?php
 /**
  * Eliza - Simple php acceptance testing framework
- * 
- * 
+ *
+ *
  * @author		SnowHall - http://snowhall.com
  * @website		http://elizatesting.com
  * @email		support@snowhall.com
- * 
- * @version		0.1.0
- * @date		March 8, 2013
- * 
+ *
+ * @version		0.2.0
+ * @date		April 18, 2013
+ *
  * Eliza - simple framework for BDD development and acceptance testing.
  * Eliza has user-friendly web interface that allows run and manage your tests from your favorite browser.
  *
@@ -68,22 +68,6 @@ class Report {
       'y' => 100
     );
     $statistic = array_reverse($statistic);
-
-    /*$statistic = array(array('x'=> -1893456000, 'y'=>100),
-      array('x'=> -1893456000, 'y' => 25),
-      array('x' => -1577923200, 'y' => 29),
-      array('x' => -1262304000, 'y' => 34),
-      array('x' => -946771200, 'y' => 35),
-      array('x' => -631152000, 'y' => 39),
-      array('x' => -315619200, 'y' => 44),
-      array('x' => 0, 'y' => 49),
-      array('x' => 315532800, 'y' => 50),
-      array('x' => 631152000, 'y' => 49),
-      array('x' => 946684800, 'y' => 53),
-      array('x' => 1262304000, 'y' => 55),
-      //array('x' => 1262304000, 'y' => 100),
-
-    );*/
 
     return json_encode($statistic);
   }

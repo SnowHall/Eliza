@@ -1,6 +1,6 @@
 <?php
   /**
-   * Test demo example.
+   * Acceptance test demo example.
    *
    * Emulates user's actions scenario:
    * - go to snowhall.com site
@@ -10,7 +10,7 @@
   */
 
   // Initialize test
-  $I = Eliza::test();
+  $I = new AcceptanceTest();
 
   // Specify short definition for test
   $I->want('Test demo site');
@@ -20,6 +20,9 @@
 
   // Verifying the opening pages by checking the information contained in it
   $I->see('Web Development Service');
+
+  // Check PHP and SQL errors on the page
+  $I->checkError();
 
   // Go to link
   $I->click('Web Development Service');

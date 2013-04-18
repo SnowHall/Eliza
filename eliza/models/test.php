@@ -1,15 +1,15 @@
 <?php
 /**
  * Eliza - Simple php acceptance testing framework
- * 
- * 
+ *
+ *
  * @author		SnowHall - http://snowhall.com
  * @website		http://elizatesting.com
  * @email		support@snowhall.com
- * 
- * @version		0.1.0
- * @date		March 8, 2013
- * 
+ *
+ * @version		0.2.0
+ * @date		April 18, 2013
+ *
  * Eliza - simple framework for BDD development and acceptance testing.
  * Eliza has user-friendly web interface that allows run and manage your tests from your favorite browser.
  *
@@ -39,9 +39,8 @@ class Test
 
   public static function getTestsList($groupId)
   {
-    global $config;
     $tests = self::getTests();
-    $group = $config['groups'][$groupId];
+    $group = Group::get($groupId);
     $testsList = array();
 
     foreach($tests as $test) {
@@ -56,11 +55,11 @@ class Test
 
   public static function saveTest($name, $description)
   {
-    global $config;
     if (!$name) return false;
-    $name = preg_replace('#[^a-zA-Z0-9_]#','',$name);
-    $description = $description ? preg_replace('#[^a-zA-Z0-9_\s]#','',$description) : $config['default_description'];
-    $template = $config['test_template'];
+    $name = self::resolveName($name);
+    $description = $description ? preg_replace('#[^a-zA-Z0-9_\s]#','',$description) :
+      Config::getValue('default_description');
+    $template = Config::getValue('test_template');
 
     $testContent = str_ireplace(array('{name}','{description}','{n}'),array($name,$description,"\r\n"),$template);
 
@@ -69,26 +68,43 @@ class Test
 
   public static function testExecute($name, $show = true, $debug = false, $responseFormat = 'html', $testUrl = '')
   {
-    global $config;
-
     $options = array(
       'debug' => $debug,
       'responseFormat' => $responseFormat,
       'testUrl' => $testUrl,
+      'error' => false,
     );
-    $test = Eliza::test(false, $options);
+    $app = Eliza::app($options);
 
     Counter::start("executionTime");
     if (file_exists(TEST_PATH.$name.'.php')) {
-      require_once TEST_PATH.$name.'.php';
+      $testFilePath = TEST_PATH.$name.'.php';
+      require_once $testFilePath;
+      $testType = self::getTestType($testFilePath);
+      if ($testType == 'unit') {
+        $unitClass = self::getUnitClassName($testFilePath);
+        $unitTest = new UnitTest($unitClass);
+        $ref = new ReflectionClass($unitClass);
+        $methods = $ref->getMethods();
+        // Remove nested methods
+        foreach ($methods as $key=>$method) {
+          if ($method->class != $unitClass) unset($methods[$key]);
+        }
+        $unitTest->invoke($methods);
+      }
     }
-    $test->executionTime = Counter::end("executionTime");
+    else {
+      $app->setResponse('Test "'.$name.'" not exists!','error');
+    }
+    $app->executionTime = Counter::end("executionTime");
+    $app->setResponse('<br />');
 
-    if ($config['log'] && !$debug) {
-      $test->logger($name);
+    if (!$debug && Config::getValue('history_store_time') !== '0') {
+      $app->logger($name);
     }
     if ($show) {
-      $test->showResponse();
+      $app->showResponse();
+      $app->clearResponse();
     }
   }
 
@@ -103,17 +119,13 @@ class Test
 
   public static function getQueueTests()
   {
-    $tests = array();
-    if (file_exists(QUEUE_FILE)) {
-      $tests = json_decode(file_get_contents(QUEUE_FILE),true);
-    }
-    return $tests ? $tests : array();
+    return Helpers::getFromJson(QUEUE_FILE);
   }
 
   public static function addTestToQueue($name, $testUrl)
   {
     $tests = self::getQueueTests();
-    if (!in_array($name,$tests)) {
+    if (empty($tests) || !in_array($name, $tests)) {
       $tests[] = array(
         'name' => $name,
         'url' => $testUrl
@@ -121,5 +133,41 @@ class Test
     }
     return file_put_contents(QUEUE_FILE, json_encode($tests));
   }
+
+  public static function getTestType($testPath) {
+    $test = file_get_contents($testPath);
+    if (strpos($test, 'UnitTest')) {
+      return 'unit';
+    }
+    else if (preg_match('/new\sAcceptance\(\)/is', $test)) {
+      return 'acceptance';
+    }
+    else return 'undefined';
+  }
+
+  public static function getUnitClassName($testPath) {
+    $test = file_get_contents($testPath);
+    preg_match('/class[^a-zA-Z]*([a-zA-Z]*)[^a-zA-Z]*extends /is', $test, $matches);
+    if (isset($matches[1])) return $matches[1];
+    return false;
+  }
+
+  public static function getTestsCheckboxList($tests) {
+    $list = array();
+    foreach($tests as $test) {
+      $list[$test] = $test;
+    }
+    return $list;
+  }
+
+  public static function resolveName($name) {
+    // change tesn name form "test new name" form to "testNewName" form
+    $parts = explode(' ', $name);
+    if (count($parts) > 1) {
+      $name = implode('', array_map('ucfirst', $parts));
+    }
+    // clear name
+    $name = preg_replace('#[^a-zA-Z0-9_]#','',$name);
+    return $name;
+  }
 }
-?>

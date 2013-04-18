@@ -1,30 +1,28 @@
 <?php
 /**
  * Eliza - Simple php acceptance testing framework
- * 
- * 
+ *
+ *
  * @author		SnowHall - http://snowhall.com
  * @website		http://elizatesting.com
  * @email		support@snowhall.com
- * 
- * @version		0.1.0
- * @date		March 8, 2013
- * 
+ *
+ * @version		0.2.0
+ * @date		April 18, 2013
+ *
  * Eliza - simple framework for BDD development and acceptance testing.
  * Eliza has user-friendly web interface that allows run and manage your tests from your favorite browser.
  *
  * Copyright (c) 2009-2013
  */
 
-require_once('aperiplus/algorithms.php');
-require_once('aperiplus/reflection.php');
+require_once(VENDORS_PATH.'aperiplus/algorithms.php');
+require_once(VENDORS_PATH.'aperiplus/reflection.php');
 
 class UndecoratedException extends Exception {}
 class DecoratorMethodConflict extends Exception {}
 class NoDecoratorSpecified extends Exception {}
 
-/*
-*/
 class DecoratorStack {
 
     var $unknown_message_type = 'cannot find a decorator with method [%s]';
@@ -50,6 +48,7 @@ class DecoratorStack {
         foreach($args as $k => &$v) {
             $cufa_hack[$k] =& $v;
         }
+
         return call_user_func_array(
             array($this->_getDecoratorWith($method), $method),
             $cufa_hack);
@@ -81,7 +80,7 @@ class DecoratorStack {
     }
     function _injector() {
         if( !isset($this->_injector)) {
-            require_once('phemto/phemto.php');
+            require_once(VENDORS_PATH.'phemto/phemto.php');
             $this->_injector = new Phemto;
         }
         return $this->_injector;
